@@ -96,42 +96,26 @@ export class BibManager {
         }
     }
 
-
+    /**
+     * find biblography file based on fileType, then workspace, then asking user for path
+     * @returns bibliography file path or null if not found.
+     */
     public async locateBibFile(): Promise<string | null> {
         const text = this.editor.document.getText();
-
         let bibPath: string | null = null;
 
-        switch (this.fileType) {
-            case 'markdown':
-            case 'quarto':
-                bibPath = await locateBibMd(text);
-                break;
-            case 'latex':
-            case 'tex':
-            case 'plaintex':
-                bibPath = await locateBibTex(text);
-                break;
-            default:
-                bibPath = await locateWorkspaceBib();
-        }
-        
-        // if no bib file found in document, try to find in workspace
-        if (!bibPath) {
-            bibPath = await locateWorkspaceBib();
-        }
-        // if no bibliography found, ask user
-        if (!bibPath) {
-            bibPath = await vscode.window.showInputBox({
-                prompt: 'Bibliography file not found. Please enter path to bibliography file (default: references.bib)',
-                placeHolder: 'Path to .bib file',
-                value: 'references.bib'
-            }) || null;
+        if (['markdown', 'quarto'].includes(this.fileType)) {
+            bibPath = await locateBibMd(text);
         }
 
-        return bibPath;
+        if (['latex', 'tex', 'plaintex'].includes(this.fileType)) {
+            bibPath = locateBibTex(text);
+        }
+        
+        // if no bib file found in document, look for in workspace or ask user
+        // if still no bib file found, ask user for path to bib file 
+        return bibPath ?? await locateWorkspaceBib() ?? await askBibFilePath();
     }
-    
 
     public async updateBibFile(item: any): Promise<void> {
         const bibFile = await this.locateBibFile();
@@ -144,13 +128,9 @@ export class BibManager {
             const bibUri = this.resolveBibUri(bibFile);
             const citeKey = item.citeKey;
 
-            // Check if file exists
+            // Check if file exists, if not, create it
             if (!await fileExists(bibUri)) {
-                // Create directory if it doesn't exist (createDirectory is recursive)
-                const dirUri = bibUri.with({ path: path.posix.dirname(bibUri.path) });
-                await vscode.workspace.fs.createDirectory(dirUri);
-                // Create empty file
-                await writeFileFromString(bibUri, '');
+                await initBib(bibUri);
                 vscode.window.showInformationMessage(`Created new bibliography file at ${bibFile}`);
             }
 
@@ -199,6 +179,37 @@ export class BibManager {
     }
 }
 
+/** 
+ * ask user for path to bibliography file, with default value 'references.bib'
+ * @return path to bibliography file or null if user cancels input
+ */
+async function askBibFilePath(): Promise<string | null> {
+    const bibPath = await vscode.window.showInputBox({
+        prompt: 'Enter path to bibliography file (default: references.bib)',
+        placeHolder: 'Path to .bib file',
+        value: 'references.bib'
+    });
+    return bibPath || null;
+}
+
+/**
+ * Create an empty bibliography file at the given URI (including creating parent directories)
+ * @param bibUri vscode.Uri of the bibliography file to create
+ */
+async function initBib(bibUri: vscode.Uri): Promise<void> {
+    // Create directory if it doesn't exist (createDirectory is recursive)
+    const dirUri = bibUri.with({ path: path.posix.dirname(bibUri.path) });
+    await vscode.workspace.fs.createDirectory(dirUri);
+    // Create empty file
+    await writeFileFromString(bibUri, '');
+}
+        
+/**
+ * Check if a given citeKey already exists in the bibliography content.
+ * @param citeKey Better BibTeX citation key to check for
+ * @param bibContent content of the bibliography file
+ * @returns true if citeKey exists, false otherwise
+ */
 export function checkCiteKeyExists(citeKey: string, bibContent: string): boolean {
     if (new RegExp(`^@.*\\{${citeKey},`, 'm').test(bibContent)) {
         vscode.window.showInformationMessage(`Entry for @${citeKey} already exists in bibliography`);
@@ -207,77 +218,74 @@ export function checkCiteKeyExists(citeKey: string, bibContent: string): boolean
     return false;
 }
 
-// function to locate bibliography file
-async function locateBibMdYaml(text: string): Promise<string | null> {
-    // parse any *.bib file from YAML string
-    const match = text.match(/['"]?([^'"\s\[\],]+\.bib)['"]?/);
-    if (match) {
-        return match[1];
-    }
-    return null;
+// functions to locate bibliography file
+/**
+ * Check for biblography file in markdown/quarto documents in the YAML header
+ * @param text content of current file
+ * @returns bibliography file path if found, otherwise null
+ */
+function locateBibMdYaml(text: string): string | null {
+    return text.match(/['"]?([^'"\s\[\],]+\.bib)['"]?/)?.[1] ?? null;
 }
 
+/**
+ * Check for biblography file in _quarto.yml in the root of the workspace
+ * @returns bibliography file path if found, otherwise null
+ */
 async function locateBibMdProject(): Promise<string | null> {
-    // Check for _quarto.yml in project root
-    const workspaceFolders = vscode.workspace.workspaceFolders;
-    if (workspaceFolders) {
-        const quartoYmlUri = vscode.Uri.joinPath(workspaceFolders[0].uri, '_quarto.yml');
-        if (await fileExists(quartoYmlUri)) {
-            const quartoYml = await readFileAsString(quartoYmlUri);
-            return await locateBibMdYaml(quartoYml);
-        }
-    }
-    return null;
+    const rootUri = vscode.workspace.workspaceFolders?.[0].uri;
+    if (!rootUri) { return null; }
+
+    const quartoYmlUri = vscode.Uri.joinPath(rootUri, '_quarto.yml');
+    if (!await fileExists(quartoYmlUri)) { return null; }
+
+    return locateBibMdYaml(await readFileAsString(quartoYmlUri));
 }
 
+/**
+ * Locate bibliography file for markdown/quarto documents by first checking YAML header,
+ * then _quarto.yml in workspace.
+ * @param text content of current file
+ * @returns bibliography file path if found, otherwise null
+ */
 async function locateBibMd(text: string): Promise<string | null> {
-    const headerResult = await locateBibMdYaml(text);
-    if (headerResult) {
-        return headerResult;
-    }
-    const projectResult = await locateBibMdProject();
-    if (projectResult) {
-        return projectResult;
-    }
+    return locateBibMdYaml(text) ?? await locateBibMdProject();
+}
+
+/**
+ * Locate bibliography file for LaTeX documents
+ * @param text content of current file
+ * @returns bibliography file path if found, otherwise null
+ */
+function locateBibTex(text: string): string | null {
+    // look for \bibliography{...}
+    const bib = text.match(/\\bibliography\{['"]?([^'"{}]+)['"]?\}/);
+    if (bib) { return `${bib[1]}.bib`; }
+
+    // look for \addbibresource{...}
+    const biblatex = text.match(/\\addbibresource\{['"]?([^'"{}]+)['"]?\}/);
+    // if it ends with .bib, return as is, otherwise append .bib
+    if (biblatex) { return biblatex[1].endsWith('.bib') ? biblatex[1] : `${biblatex[1]}.bib`; }
+
     return null;
 }
 
-async function locateBibTex(text: string): Promise<string | null> {
-    // Look for \bibliography or \addbibresource
-    const bibMatch = text.match(/\\bibliography\{['"]?([^'"{}]+)['"]?\}/);
-    if (bibMatch) {
-        return `${bibMatch[1]}.bib`;
-    }
-
-    const biblatexMatch = text.match(/\\addbibresource\{['"]?([^'"{}]+)['"]?\}/);
-    if (biblatexMatch) {
-        let bibFile = biblatexMatch[1];
-        if (!bibFile.endsWith('.bib')) {
-            bibFile += '.bib';
-        }
-        return bibFile;
-    }
-    return null;
-}
-
+/**
+ * Check for biblography file in the root of the workspace
+ * @returns bibliography file path if found, otherwise null
+ */
 async function locateWorkspaceBib(): Promise<string | null> {
-    const workspaceFolders = vscode.workspace.workspaceFolders;
-    if (!workspaceFolders || workspaceFolders.length === 0) {
-        return null;
-    }
-    const rootUri = workspaceFolders[0].uri;
-    const candidates = ['bibliography.bib', 'references.bib'];
-    for (const candidate of candidates) {
-        const candidateUri = vscode.Uri.joinPath(rootUri, candidate);
-        if (await fileExists(candidateUri)) {
+    // first, check if root workspace exists
+    const rootUri = vscode.workspace.workspaceFolders?.[0].uri;
+    if (!rootUri) { return null; }
+
+    for (const candidate of ['bibliography.bib', 'references.bib']) {
+        if (await fileExists(vscode.Uri.joinPath(rootUri, candidate))) {
             return candidate;
         }
     }
+
     const entries = await vscode.workspace.fs.readDirectory(rootUri);
-    for (const [name, type] of entries) {
-        if (name.endsWith('.bib') && type === vscode.FileType.File) {
-            return name;
-        }
-    }
-    return null;
+    const bibEntry = entries.find(([name, type]) => name.endsWith('.bib') && type === vscode.FileType.File);
+    return bibEntry?.[0] ?? null;
 }
