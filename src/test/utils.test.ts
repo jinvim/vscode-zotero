@@ -3,7 +3,7 @@ import { expandPath,
     formatAuthors,
     extractYear,
     extractDate,
-    formatCitation,
+    formatCiteKey,
     isValidBibEntry,
     fileExists
  } from '../utils';
@@ -68,9 +68,9 @@ suite('Helpers', () => {
     });
 
     test('formatCitation', async () => {
-        const latex = formatCitation('Crowley2020', 'latex');
+        const latex = formatCiteKey('Crowley2020', 'latex');
         assert.strictEqual(latex, 'Crowley2020');
-        const quarto = formatCitation('Ginger2020', 'quarto');
+        const quarto = formatCiteKey('Ginger2020', 'quarto');
         assert.strictEqual(quarto, '@Ginger2020');
     });
     

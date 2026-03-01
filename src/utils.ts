@@ -39,7 +39,7 @@ export function extractDate(date: string): string | null {
     return match ? match[1] : null;
 }
 
-export function formatCitation(citeKey: string, fileType: string): string {
+export function formatCiteKey(citeKey: string, fileType: string): string {
     switch (fileType) {
         case 'latex':
         case 'tex':

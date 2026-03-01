@@ -3,7 +3,7 @@ import * as path from 'path';
 import {
     handleError,
     isValidBibEntry,
-    formatCitation,
+    formatCiteKey,
     fileExists
 } from './utils';
 import {
@@ -32,6 +32,13 @@ export class BibManager {
         this.serverUrl = 'http://localhost:23119';
     }
 
+    /**
+     * Resolve the URI for the bibliography file
+     * If the path is absolute, return as is.
+     * If the path is relative, resolve URI relative to the current document.
+     * @param bibFile name of bibliography file
+     * @returns vscode.Uri for the bibliography file
+     */
     private resolveBibUri(bibFile: string): vscode.Uri {
         // if bibFile is an absolute path, return it as is
         if (path.isAbsolute(bibFile)) {
@@ -42,55 +49,46 @@ export class BibManager {
     }
 
     /**
+     * Parse the response from Better BibTeX JSON-RPC call
+     * @param json JSON response
+     * @returns Bib(La)TeX entry if successful, otherwise empty string and shows error message
+     */
+    private parseBbtResponse(json: any): string {
+        if (json.error) {
+            const msg = json.error.code === -32603
+                ? 'Cannot connect to Better BibTeX. Make sure Zotero window is open!'
+                : `Better BibTeX error: ${json.error.message || 'Unknown error'}`;
+            vscode.window.showErrorMessage(msg);
+            return '';
+        }
+        if (typeof json.result !== 'string') {
+            vscode.window.showErrorMessage('Better BibTeX returned invalid result format');
+            return '';
+        }
+        return json.result;
+    }
+
+    /**
      * get Bib(La)TeX entry using Better BibTeX json-rpc
      * @param item the zotero item to convert.
      * @returns Bib(La)TeX entry.
      */
-    public async bbtExport(
-        item: any
-    ): Promise<string> {
+    public async bbtExport(item: any): Promise<string> {
         const url = `${this.serverUrl}/better-bibtex/json-rpc`;
-
         const payload = {
             jsonrpc: '2.0',
             method: 'item.export',
-            params: {
-                citekeys: [item.citeKey],
-                translator: this.translator,
-                libraryID: item.libraryID
-            }
+            params: { citekeys: [item.citeKey], translator: this.translator, libraryID: item.libraryID }
         };
 
         try {
             const response = await fetch(url, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Accept: 'application/json',
-                },
+                headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
                 body: JSON.stringify(payload),
             });
-            const json = await response.json();
-
-            // Handle JSON-RPC errors
-            if (json.error) {
-                if (json.error.code === -32603) {
-                    vscode.window.showErrorMessage(`Cannot connect to Better BibTeX. Make sure Zotero window is open!`);
-                    return '';
-                }
-                vscode.window.showErrorMessage(`Better BibTeX error: ${json.error.message || 'Unknown error'}`);
-                return '';
-            }
-
-            // Ensure result is a string
-            if (typeof json.result !== 'string') {
-                vscode.window.showErrorMessage('Better BibTeX returned invalid result format');
-                return '';
-            }
-
-            return json.result;
-
-        } catch (error) {
+            return this.parseBbtResponse(await response.json());
+        } catch {
             vscode.window.showErrorMessage('Cannot connect to Better BibTeX. Make sure Zotero is running!');
             return '';
         }
@@ -117,6 +115,10 @@ export class BibManager {
         return bibPath ?? await locateWorkspaceBib() ?? await askBibFilePath();
     }
 
+    /**
+     * Update the bibliography file with a new entry.
+     * @param item the zotero item to add to the bibliography.
+     */
     public async updateBibFile(item: any): Promise<void> {
         const bibFile = await this.locateBibFile();
         if (!bibFile) {
@@ -126,40 +128,25 @@ export class BibManager {
 
         try {
             const bibUri = this.resolveBibUri(bibFile);
-            const citeKey = item.citeKey;
+            const { citeKey } = item;
+            const bibContent = await ensureBibFile(bibUri, bibFile);
 
-            // Check if file exists, if not, create it
-            if (!await fileExists(bibUri)) {
-                await initBib(bibUri);
-                vscode.window.showInformationMessage(`Created new bibliography file at ${bibFile}`);
-            }
-
-            const bibContent = await readFileAsString(bibUri);
+            // if bib entry for citeKey already exists, just insert citation without updating bib file
             if (checkCiteKeyExists(citeKey, bibContent)) {
-                this.insertCite(item);
+                this.insertCite(citeKey);
                 return;
             }
-
-            // Get BibTeX entry
+            
+            // get bib entry from Better BibTeX
             const bibEntry = await this.bbtExport(item);
-            // if bibEntry is empty or undefined, return (probably could not connect to BBT server)
-            if (!bibEntry || bibEntry.trim() === '') {
-                return;
-            }
-
-            // check if bibEntry is valid
             if (!isValidBibEntry(bibEntry)) {
                 vscode.window.showErrorMessage('Invalid BibLaTeX entry. Not updating bibliography file.');
                 return;
             }
 
-            this.insertCite(item);
-
-            // Add empty line before new entry if file is not empty
-            const needsEmptyLine = bibContent.trim().length > 0 && !bibContent.trim().endsWith('\n');
-            const newContent = bibContent + (needsEmptyLine ? '\n' : '') + bibEntry;
-
-            // Write updated content
+            this.insertCite(citeKey);
+            // append new bib entry to bibliography file (with a newline if the file is not empty)
+            const newContent = bibContent + (bibContent.trim() ? '\n' : '') + bibEntry;
             await writeFileFromString(bibUri, newContent);
             vscode.window.showInformationMessage(`Added @${citeKey} to ${bibFile}`);
         } catch (error) {
@@ -167,10 +154,13 @@ export class BibManager {
         }
     }
 
-    private insertCite(item: any) {
+    /**
+     * Insert a citation to the current document at the cursor position
+     * @param citeKey citation key
+     */
+    private insertCite(citeKey: string) {
         // Format citation key based on file type
-        const citeKey = item.citeKey;
-        let formattedCitation = formatCitation(citeKey, this.fileType);
+        const formattedCitation = formatCiteKey(citeKey, this.fileType);
 
         // Insert citation
         this.editor.edit(editBuilder => {
@@ -191,6 +181,21 @@ async function askBibFilePath(): Promise<string | null> {
     });
     return bibPath || null;
 }
+
+/** 
+ * Ensure that the bibliography file exists at the given URI, creating it if necessary.
+ * @param bibUri vscode.Uri of the bibliography file
+ * @param bibFile name of the bibliography file
+ * @returns content of the bibliography file as a string
+ */
+async function ensureBibFile(bibUri: vscode.Uri, bibFile: string): Promise<string> {
+    if (!await fileExists(bibUri)) {
+        await initBib(bibUri);
+        vscode.window.showInformationMessage(`Created new bibliography file at ${bibFile}`);
+    }
+    return readFileAsString(bibUri);
+}
+
 
 /**
  * Create an empty bibliography file at the given URI (including creating parent directories)
