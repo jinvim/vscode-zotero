@@ -7,7 +7,7 @@ import {
     formatAuthors,
     formatTypes,
     handleError
-} from './helpers';
+} from './utils';
 
 export function activate(context: vscode.ExtensionContext) {
 

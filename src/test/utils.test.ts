@@ -5,7 +5,7 @@ import { expandPath,
     extractDate,
     formatCitation,
     isValidBibEntry
- } from '../helpers';
+ } from '../utils';
 
 suite('Helpers', () => {
     test('expandPath', async () => {

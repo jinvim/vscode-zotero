@@ -10,7 +10,7 @@ import {
     handleError,
     extractYear,
     formatTypes
-} from './helpers';
+} from './utils';
 
 /**
  * class for managing Zotero database connection and queries

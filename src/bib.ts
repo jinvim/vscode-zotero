@@ -4,15 +4,14 @@ import {
     handleError,
     isValidBibEntry,
     formatCitation
-} from './helpers';
+} from './utils';
 
+/**
+ * class for finding, managing *.bib files, and communicating with Better BibTeX for exporting Bib(La)TeX entries
+ * @param editor vscode.TextEditor instance to determine current document and workspace context.
+ * @param fileType the filetype of the current document (e.g., 'bibtex', 'latex').
+ */
 export class BibManager {
-    /**
-     * Export better bibtex citation using JSON-RPC
-     * @param item The Zotero item to export.
-     * @param translator The Better BibTeX translator to use.
-     * @returns The exported Bib(La)TeX entry.
-     */
 
     private translator: string;
     private editor: vscode.TextEditor;
@@ -55,7 +54,11 @@ export class BibManager {
         const data = new TextEncoder().encode(content);
         await vscode.workspace.fs.writeFile(uri, data);
     }
-
+    /**
+     * get Bib(La)TeX entry using Better BibTeX json-rpc
+     * @param item the zotero item to convert.
+     * @returns Bib(La)TeX entry.
+     */
     public async bbtExport(
         item: any
     ): Promise<string> {

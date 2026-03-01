@@ -1,30 +1,10 @@
-
 import * as assert from 'assert';
-import * as vscode from 'vscode';
-import * as path from 'path';
 import {
-    ZoteroDatabase,
-} from '../zotero';
+    initZoteroDb,
+    parseJsonFile,
+} from './utils';
 
 suite('ZoteroDatabase', () => {
-    /** resolve path for reading files in src/test/resources.test */
-    function joinFixturePath(filename: string): vscode.Uri {
-        const fixtureDir = path.join(__dirname, '..', '..', 'src', 'test', 'resources.test');
-        return vscode.Uri.file(path.join(fixtureDir, filename));
-    }
-    
-    function initZoteroDb(filename: string): ZoteroDatabase {
-        const zoteroDbPath = joinFixturePath(filename).path;
-        return new ZoteroDatabase(zoteroDbPath);
-    };
-
-    async function parseJsonFile(filename: string): Promise<any> {
-        const filePath = joinFixturePath(filename);
-        return JSON.parse(
-            await vscode.workspace.fs.readFile(filePath).then(buffer => buffer.toString())
-        );
-    }
-
     // -------------------------------------------------------------------------
     suite('ZoteroDatabase - Basics', () => {
         test('init and close database', async () => {

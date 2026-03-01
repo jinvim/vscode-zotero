@@ -1,31 +1,13 @@
 import * as assert from 'assert';
 import * as vscode from 'vscode';
-import * as path from 'path';
-import { BibManager } from '../bib';
-import { isValidBibEntry } from '../helpers';
+import { isValidBibEntry } from '../utils';
+import {
+    joinFixturePath,
+    makeManagerFromFile,
+    makeManagerWithContent
+} from './utils';
 
 suite('BibManager', () => {
-    /** creates a bibmanager from content (in-memory) */
-    async function makeManagerWithContent(content: string, fileType: string): Promise<BibManager> {
-        const doc = await vscode.workspace.openTextDocument({ content, language: fileType });
-        const editor = await vscode.window.showTextDocument(doc);
-        return new BibManager(editor, fileType);
-    }
-
-    /** creates a bibmanager from file. */
-    async function makeManagerFromFile(filename: string, fileType: string): Promise<BibManager> {
-        const uri = joinFixturePath(filename);
-        const doc = await vscode.workspace.openTextDocument(uri);
-        const editor = await vscode.window.showTextDocument(doc);
-        return new BibManager(editor, fileType);
-    }
-
-    /** resolve path for reading files in src/test/resources.test */
-    function joinFixturePath(filename: string): vscode.Uri {
-        const fixtureDir = path.join(__dirname, '..', '..', 'src', 'test', 'resources.test');
-        return vscode.Uri.file(path.join(fixtureDir, filename));
-    }
-
     // -------------------------------------------------------------------------
     suite('locateBibFile — LaTeX', () => {
         teardown(async () => {
