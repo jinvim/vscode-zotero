@@ -155,7 +155,7 @@ export class BibManager {
             }
 
             const bibContent = await readFileAsString(bibUri);
-            if (await checkCiteKeyExists(citeKey, bibContent)) {
+            if (checkCiteKeyExists(citeKey, bibContent)) {
                 this.insertCite(item);
                 return;
             }
@@ -199,16 +199,10 @@ export class BibManager {
     }
 }
 
-
-export async function checkCiteKeyExists(citeKey: string, bibContent: string): Promise<boolean> {
-    const lines = bibContent.split('\n');
-
-    // Check if entry already exists
-    for (let i = 0; i < lines.length; i++) {
-        if (lines[i].match(new RegExp(`^@.*{${citeKey},`))) {
-            vscode.window.showInformationMessage(`Entry for @${citeKey} already exists in bibliography`);
-            return true;
-        }
+export function checkCiteKeyExists(citeKey: string, bibContent: string): boolean {
+    if (new RegExp(`^@.*\\{${citeKey},`, 'm').test(bibContent)) {
+        vscode.window.showInformationMessage(`Entry for @${citeKey} already exists in bibliography`);
+        return true;
     }
     return false;
 }

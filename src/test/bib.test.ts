@@ -120,11 +120,11 @@ suite('BibManager', () => {
             const bibContent = await readFileAsString(bibUri);
         
             // existing cite key
-            const existsResult = await checkCiteKeyExists('shannon1948', bibContent);
+            const existsResult = checkCiteKeyExists('shannon1948', bibContent);
             assert.strictEqual(existsResult, true);
             
             // non-existing cite key
-            const notExistsResult = await checkCiteKeyExists('crowley2020', bibContent);
+            const notExistsResult = checkCiteKeyExists('crowley2020', bibContent);
             assert.strictEqual(notExistsResult, false);
         });
     // unimplemented tests
