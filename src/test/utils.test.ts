@@ -4,8 +4,10 @@ import { expandPath,
     extractYear,
     extractDate,
     formatCitation,
-    isValidBibEntry
+    isValidBibEntry,
+    fileExists
  } from '../utils';
+ import { joinFixturePath } from './utils';
 
 suite('Helpers', () => {
     test('expandPath', async () => {
@@ -85,5 +87,17 @@ suite('Helpers', () => {
             year={2020}
         }`;
         assert.strictEqual(isValidBibEntry(invalidEntry), false);
+    });
+
+    test('fileExists', async () => {
+        // test with existing file
+        const existingUri = joinFixturePath('bib.test.bib');
+        const existsResult = await fileExists(existingUri);
+        assert.strictEqual(existsResult, true);
+
+        // test with non-existing file
+        const nonExistingUri = joinFixturePath('nonexistent.bib');
+        const notExistsResult = await fileExists(nonExistingUri);
+        assert.strictEqual(notExistsResult, false);
     });
 });
