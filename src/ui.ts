@@ -9,168 +9,119 @@ import {
     handleError
 } from './utils';
 
-export const searchLibrary = vscode.commands.registerCommand('zotero.searchLibrary', async () => {
-    // initialize configuration
-    const zoteroDb = initZoteroDb();
+/**
+ * Initializes the Zotero database connection using the path specified in the extension settings.
+ * @returns ZoteroDatabase instance
+ */
+function initZoteroDb(): ZoteroDatabase {
+    const config = vscode.workspace.getConfiguration('zotero');
+    const zoteroDbPath = expandPath(config.get<string>('zoteroDbPath', '~/Zotero/zotero.sqlite'));
+    if (!existsSync(zoteroDbPath)) {
+        vscode.window.showErrorMessage(`Zotero database not found at path: ${zoteroDbPath}`);
+        throw new Error(`Zotero database not found at path: ${zoteroDbPath}`);
+    }
+    return new ZoteroDatabase(zoteroDbPath);
+}
 
+/**
+ * Executes a function that requires a ZoteroDatabase connection.
+ * @param fn function that requires ZoteroDatabase connection
+ */
+async function withZoteroDb(
+    fn: (db: ZoteroDatabase, editor: vscode.TextEditor) => Promise<void>
+) {
     const editor = vscode.window.activeTextEditor;
     if (!editor) {
         vscode.window.showErrorMessage('No active editor');
         return;
     }
-    const fileType = editor.document.languageId;
-
+    const zoteroDb = initZoteroDb();
     try {
-        // Connect to database
         await zoteroDb.connectIfNeeded();
+        await fn(zoteroDb, editor);
+    } catch (error) {
+        handleError(error, 'Error occurred in Zotero command');
+    } finally {
+        zoteroDb.close();
+    }
+}
 
-        // Get items from Zotero
+export function searchLibrary() {
+    return withZoteroDb(async (zoteroDb, editor) => {
         const items = await zoteroDb.getItems();
-
         if (items.length === 0) {
             vscode.window.showInformationMessage('No items found in Zotero library');
             return;
         }
 
-        // Create QuickPick items
-        const quickPickItems = items.map(item => {
-            const creators = item.creators;
-            const authors = formatAuthors(creators);
+        const quickPickItems = items.map(item => ({
+            label: `${formatTypes(item.itemType)} ${formatAuthors(item.creators)} (${item.year || 'n.d.'})`,
+            description: `@${item.citeKey}`,
+            detail: item.title,
+            item,
+        }));
 
-            // determine icon based on item type
-            const icon = formatTypes(item.itemType);
-
-            return {
-                label: `${icon} ${authors} (${item.year || 'n.d.'})`,
-                description: `@${item.citeKey}`,
-                item: item,
-                detail: item.title
-            };
-        });
-
-        // Show QuickPick
-        let selected = await vscode.window.showQuickPick(quickPickItems, {
+        const selected = await vscode.window.showQuickPick(quickPickItems, {
             placeHolder: 'Search Zotero library',
             matchOnDescription: true,
-            matchOnDetail: true
+            matchOnDetail: true,
         });
 
         if (selected) {
-            const bibManager = new BibManager(editor, fileType);
-            bibManager.updateBibFile(selected.item);
+            new BibManager(editor, editor.document.languageId).updateBibFile(selected.item);
         }
-    } catch (error) {
-        handleError(error, `Error occurred while searching Zotero library`);
-    } finally {
-        zoteroDb.close();
-    }
-});
+    });
+}
 
-export const openItem = vscode.commands.registerCommand('zotero.openItem', async () => {
-    // initialize configuration
-    const zoteroDb = initZoteroDb();
-
-    const editor = vscode.window.activeTextEditor;
-    if (!editor) {
-        vscode.window.showErrorMessage('No active editor');
-        return;
-    }
-    const fileType = editor.document.languageId;
-
-    try {
-        // Connect to database
-        await zoteroDb.connectIfNeeded();
-
-        // Get the current position and word under cursor
-        const position = editor.selection.active;
-        const document = editor.document;
-        // regex to match citation keys with hypehens
-        const wordRange = document.getWordRangeAtPosition(position, /@?[\w-]+/);
-
+export function openItem() {
+    return withZoteroDb(async (zoteroDb, editor) => {
+        const wordRange = editor.document.getWordRangeAtPosition(editor.selection.active, /@?[\w-]+/);
         if (!wordRange) {
             vscode.window.showInformationMessage('No word found at cursor position');
             return;
         }
 
-        const word = document.getText(wordRange);
-
-        let citeKey = word;
-        // extract citation key (remove the @ symbol)
-        if (citeKey.startsWith('@')) {
-            citeKey = citeKey.substring(1);
-        }
+        const word = editor.document.getText(wordRange);
+        const citeKey = word.startsWith('@') ? word.substring(1) : word;
 
         const openOptions = await zoteroDb.getOpenOptions(citeKey);
-        if (!openOptions) {
+        if (!openOptions) { return; }
+        if (openOptions.length === 0) {
+            vscode.window.showInformationMessage('No PDF or DOI found for this item');
             return;
         }
 
-        if (openOptions.length === 0) {
-            vscode.window.showInformationMessage(`No PDF or DOI found for this item`);
-            return;
-        }
         if (openOptions.length === 1) {
             openAttachment(openOptions[0]);
-        } else {
-            // Show QuickPick for multiple options
-            const quickPickItems = openOptions.map((option, index) => ({
-                label: option.type === 'pdf' ? 'Open PDF' :
-                    option.type === 'doi' ? 'Open DOI link' :
-                        option.type === 'zotero' ? 'Open in Zotero' : '',
-                option: option,
-                index: index
-            }));
-
-            const selectedItem = await vscode.window.showQuickPick(quickPickItems, {
-                placeHolder: 'Choose action'
-            });
-
-            if (selectedItem) {
-                openAttachment(selectedItem.option);
-            }
+            return;
         }
-    } catch (error) {
-        handleError(error, `Error occurred while opening Zotero item`);
-    } finally {
-        zoteroDb.close();
-    }
-});
 
-function openAttachment(option: any): void {
-    switch (option.type) {
-        case 'doi':
-            vscode.env.openExternal(vscode.Uri.parse(`https://doi.org/${option.key}`));
-            break;
-        case 'zotero':
-            if (option.groupID) {
-                vscode.env.openExternal(vscode.Uri.parse(`zotero://select/groups/${option.groupID}/items/${option.key}`));
-                break;
-            }
-            vscode.env.openExternal(vscode.Uri.parse(`zotero://select/library/items/${option.key}`));
-            break;
-        case 'pdf':
-            if (option.groupID) {
-                vscode.env.openExternal(vscode.Uri.parse(`zotero://open-pdf/groups/${option.groupID}/items/${option.key}`));
-                break;
-            }
-            vscode.env.openExternal(vscode.Uri.parse(`zotero://open-pdf/library/items/${option.key}`));
-            break;
-        default:
-            break;
-    }
+        const labels: Record<string, string> = {
+            pdf: 'Open PDF',
+            doi: 'Open DOI link',
+            zotero: 'Open in Zotero',
+        };
+        const quickPickItems = openOptions.map(option => ({
+            label: labels[option.type] ?? '',
+            option,
+        }));
+
+        const selected = await vscode.window.showQuickPick(quickPickItems, { placeHolder: 'Choose action' });
+        if (selected) { openAttachment(selected.option); }
+    });
 }
 
-function initZoteroDb(): ZoteroDatabase {
-    const config = vscode.workspace.getConfiguration('zotero');
-    let zoteroDbPath = config.get<string>('zoteroDbPath', '~/Zotero/zotero.sqlite');
-    zoteroDbPath = expandPath(zoteroDbPath);
-
-    const zoteroDbExists = existsSync(zoteroDbPath);
-
-    if (!zoteroDbExists) {
-        vscode.window.showErrorMessage(`Zotero database not found at path: ${zoteroDbPath}`);
-        throw new Error(`Zotero database not found at path: ${zoteroDbPath}`);
-    }
-
-    return new ZoteroDatabase(zoteroDbPath);
+function openAttachment(option: any) {
+    // handle item in a group library
+    // if option.groupID is present, use groups/{groupID} in the URL
+    // otherwise use library for personal library
+    const scope = option.groupID ? `groups/${option.groupID}` : 'library';
+    const { key } = option;
+    const urls: Record<string, string> = {
+        doi: `https://doi.org/${key}`,
+        zotero: `zotero://select/${scope}/items/${key}`,
+        pdf: `zotero://open-pdf/${scope}/items/${key}`,
+    };
+    const url = urls[option.type];
+    if (url) { vscode.env.openExternal(vscode.Uri.parse(url)); }
 }
