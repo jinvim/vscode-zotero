@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-03-04
+
+- Reverted dependency version of `@types/vscode` to `^1.105.1` to maintain compatibility with Cursor (issue #21).
+
 ## [1.3.0] - 2026-03-01
 
 ### Breaking changes
