@@ -112,7 +112,7 @@ export class BibManager {
         
         // if no bib file found in document, look for in workspace or ask user
         // if still no bib file found, ask user for path to bib file 
-        return bibPath ?? await locateWorkspaceBib() ?? await askBibFilePath();
+        return bibPath ?? await locateWorkspaceBib(this.editor.document.uri) ?? await askBibFilePath();
     }
 
     /**
@@ -279,18 +279,23 @@ function locateBibTex(text: string): string | null {
  * Check for biblography file in the root of the workspace
  * @returns bibliography file path if found, otherwise null
  */
-async function locateWorkspaceBib(): Promise<string | null> {
+async function locateWorkspaceBib(docUri: vscode.Uri): Promise<string | null> {
     // first, check if root workspace exists
     const rootUri = vscode.workspace.workspaceFolders?.[0].uri;
     if (!rootUri) { return null; }
 
+    const docDir = path.posix.dirname(docUri.path);
+    const toDocRelative = (uri: vscode.Uri): string => path.posix.relative(docDir, uri.path);
+
     for (const candidate of ['bibliography.bib', 'references.bib']) {
-        if (await fileExists(vscode.Uri.joinPath(rootUri, candidate))) {
-            return candidate;
+        const bibUri = vscode.Uri.joinPath(rootUri, candidate);
+        if (await fileExists(bibUri)) {
+            return toDocRelative(bibUri);
         }
     }
 
     const entries = await vscode.workspace.fs.readDirectory(rootUri);
     const bibEntry = entries.find(([name, type]) => name.endsWith('.bib') && type === vscode.FileType.File);
-    return bibEntry?.[0] ?? null;
+    if (!bibEntry) { return null; }
+    return toDocRelative(vscode.Uri.joinPath(rootUri, bibEntry[0]));
 }
