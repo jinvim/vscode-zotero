@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [1.3.2] - 2026-03-06
+
+### Bug fixes
+
+- Fixed issue where `*.bib` file in the workspace is not correctly resolved (#22)
+
+### New features
+
+- Improved algorithm for resolving `*.bib` file in the workspace.
+  - The extension will now prioritize `*.bib` files that are closer to the current document
+  - For example, `../references.bib` will be prioritized over `../../references.bib`.
+  - Same as before, `bibliography.bib` or `references.bib` are prioritized if they exist.
+
 ## [1.3.1] - 2026-03-04
 
 - Reverted dependency version of `@types/vscode` to `^1.105.1` to maintain compatibility with Cursor (issue #21).
