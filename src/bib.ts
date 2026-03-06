@@ -129,7 +129,7 @@ export class BibManager {
         try {
             const bibUri = this.resolveBibUri(bibFile);
             const { citeKey } = item;
-            const bibContent = await ensureBibFile(bibUri, bibFile);
+            const bibContent = await ensureBibFile(bibUri);
 
             // if bib entry for citeKey already exists, just insert citation without updating bib file
             if (checkCiteKeyExists(citeKey, bibContent)) {
@@ -190,10 +190,10 @@ async function askBibFilePath(): Promise<string | null> {
  * @param bibFile name of the bibliography file
  * @returns content of the bibliography file as a string
  */
-async function ensureBibFile(bibUri: vscode.Uri, bibFile: string): Promise<string> {
+async function ensureBibFile(bibUri: vscode.Uri): Promise<string> {
     if (!await fileExists(bibUri)) {
         await initBib(bibUri);
-        vscode.window.showInformationMessage(`Created new bibliography file at ${bibFile}`);
+        vscode.window.showInformationMessage(`Created new bibliography file at ${bibUri.fsPath}`);
     }
     return readFileAsString(bibUri);
 }
