@@ -54,6 +54,12 @@ For any citations that were inserted using this extension, you can:
 * `zotero.betterBibtexDbPath`: Path to Better BibTex database file (default: `~/Zotero/better-bibtex.sqlite`).
 * `zotero.betterBibtexTranslator`: Better BibTeX translator to use for exporting entries (default: `Better BibLaTeX`).
 
+## Customizing *.bib entry
+
+The extension uses Better BibLaTeX translator to export entries from Zotero library.
+If you want to exclude certain fields from the exported bib entry, you need to set "Fields to omit from export" in Better BibTeX settings in Zotero (Zotero Settings > Better BibTeX > Export > Fields to omit from export).
+For example, if you want to exclude `langid` and `file` fields, you can add `langid,file` to this setting.
+
 ## Release Notes
 
 See [CHANGELOG.md](CHANGELOG.md)
