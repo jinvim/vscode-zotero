@@ -6,7 +6,7 @@
 
 ### Bug fixes
 
-- Fixed issue where `*.bib` file in the workspace is not correctly resolved (#22)
+- Fixed issue where `*.bib` file in the workspace is not correctly resolved (#22; Thanks to @ha0xin).
 
 ### New features
 
