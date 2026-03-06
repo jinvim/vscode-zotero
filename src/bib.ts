@@ -47,7 +47,7 @@ export class BibManager {
         // otherwise, resolve it relative to the current document
         return vscode.Uri.joinPath(this.editor.document.uri, '..', bibFile);
     }
-
+    
     /**
      * Parse the response from Better BibTeX JSON-RPC call
      * @param json JSON response
@@ -148,7 +148,9 @@ export class BibManager {
             // append new bib entry to bibliography file (with a newline if the file is not empty)
             const newContent = bibContent + (bibContent.trim() ? '\n' : '') + bibEntry;
             await writeFileFromString(bibUri, newContent);
-            vscode.window.showInformationMessage(`Added @${citeKey} to ${bibFile}`);
+            // show success message with relative path to bib file for better readability
+            const formattedPath = toDocRelative(this.editor.document.uri, bibUri);
+            vscode.window.showInformationMessage(`Added @${citeKey} to ${formattedPath}`);
         } catch (error) {
             handleError(error, `Failed to update bibliography file`);
         }
@@ -280,22 +282,33 @@ function locateBibTex(text: string): string | null {
  * @returns bibliography file path if found, otherwise null
  */
 async function locateWorkspaceBib(docUri: vscode.Uri): Promise<string | null> {
-    // first, check if root workspace exists
-    const rootUri = vscode.workspace.workspaceFolders?.[0].uri;
-    if (!rootUri) { return null; }
+    // get workspace folder for current document, or default to first workspace folder if not found
+    const workspaceFolder = vscode.workspace.getWorkspaceFolder(docUri) ?? vscode.workspace.workspaceFolders?.[0];
+    if (!workspaceFolder) { return null; }
 
+    // use RelativePattern to find all .bib files in the workspace
+    const bibPattern = new vscode.RelativePattern(workspaceFolder, '**/*.bib');
+    const bibUris = await vscode.workspace.findFiles(bibPattern);
+    if (bibUris.length === 0) { return null; }
+
+    // then sort bib files by their depth
+    // prioritize bib files closer to the current document
+    const depth = (rel: string) => (rel.match(/\.\.\//g) ?? []).length;
+    const bibs = bibUris
+        .map(uri => toDocRelative(docUri, uri))
+        .sort((a, b) => depth(a) - depth(b));
+
+    // if there are multiple bib files, prioritize 'bibliography.bib' or 'references.bib'
+    // if neither of those files exist, just return the closest one
+    const preferred = bibs.find(rel => ['bibliography.bib', 'references.bib'].includes(path.posix.basename(rel))) ?? bibs[0];
+    return preferred;
+}
+
+/** Convert an absolute file path to a relative path from the current document
+ * @param filePath absolute file path
+ * @returns relative file path from the current document
+ */
+function toDocRelative(docUri: vscode.Uri, fileUri: vscode.Uri): string {
     const docDir = path.posix.dirname(docUri.path);
-    const toDocRelative = (uri: vscode.Uri): string => path.posix.relative(docDir, uri.path);
-
-    for (const candidate of ['bibliography.bib', 'references.bib']) {
-        const bibUri = vscode.Uri.joinPath(rootUri, candidate);
-        if (await fileExists(bibUri)) {
-            return toDocRelative(bibUri);
-        }
-    }
-
-    const entries = await vscode.workspace.fs.readDirectory(rootUri);
-    const bibEntry = entries.find(([name, type]) => name.endsWith('.bib') && type === vscode.FileType.File);
-    if (!bibEntry) { return null; }
-    return toDocRelative(vscode.Uri.joinPath(rootUri, bibEntry[0]));
+    return path.posix.relative(docDir, fileUri.path);
 }
