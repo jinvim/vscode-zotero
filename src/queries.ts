@@ -34,15 +34,17 @@ export const queryItems = `
             GROUP BY it.key, itypes.typeName, it.libraryID, p.title, p.date, p.citeKey;
             `;
 
-// query for getting zotero item(s) by citekey — includes title/typeName/libraryName for picker
-export function queryZoteroKey(citeKey: string): string {
+// query for getting zotero item(s) by citekey(s) — includes title/typeName/libraryName for picker
+export function queryZoteroKeys(citeKeys: string[]): string {
+    const strKeys = citeKeys.map(k => `'${k.replace(/'/g, "''")}'`).join(', ');
     return `
                 SELECT
                     it.key AS zoteroKey,
                     it.libraryID,
                     itypes.typeName,
                     MAX(CASE WHEN f.fieldName = 'title' THEN idv.value END) AS title,
-                    g.name AS libraryName
+                    g.name AS libraryName,
+                    MAX(CASE WHEN f.fieldName = 'citationKey' THEN idv.value END) AS citeKey
                 FROM items it
                     INNER JOIN itemData id     ON id.itemID   = it.itemID
                     INNER JOIN itemDataValues idv ON idv.valueID = id.valueID
@@ -51,7 +53,7 @@ export function queryZoteroKey(citeKey: string): string {
                     LEFT JOIN  groups g         ON g.libraryID = it.libraryID
                 WHERE f.fieldName IN ('title', 'citationKey')
                 GROUP BY it.key, it.libraryID, itypes.typeName, g.name
-                HAVING MAX(CASE WHEN f.fieldName = 'citationKey' THEN idv.value END) = '${citeKey}';
+                HAVING MAX(CASE WHEN f.fieldName = 'citationKey' THEN idv.value END) IN (${strKeys});
             `;
 }
 

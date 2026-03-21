@@ -3,7 +3,7 @@ import * as vscode from 'vscode';
 import initSqlJs, { Database } from 'sql.js';
 import {
     queryItems,
-    queryZoteroKey,
+    queryZoteroKeys,
     queryOpenOptions
 } from './queries';
 import {
@@ -92,52 +92,88 @@ export class ZoteroDatabase {
             return null;
         }
 
-        const matches = this.getValues(this.db.exec(queryZoteroKey(citeKey)));
-
-        // if no item matches the citeKey, show an error message and return null
+        const matches = this.getValues(this.db.exec(queryZoteroKeys([citeKey])));
+        console.log(matches);
         if (matches.length === 0) {
             vscode.window.showErrorMessage(`Could not find Zotero item for ${citeKey}`);
             return null;
         }
 
-        // default to the first match if only one item matches the citeKey
-        let { zoteroKey, libraryID } = matches[0];
-
-        // if multiple items match the citeKey, prompt the user to select one
-        if (matches.length > 1) {
-            const quickPickItems = matches.map(m => ({
-                label: `${formatTypes(m.typeName)} ${m.title}`,
-                detail: m.libraryName || 'My Library',
-                zoteroKey: m.zoteroKey,
-                libraryID: m.libraryID
-            }));
-
-            const selected = await vscode.window.showQuickPick(quickPickItems, {
-                placeHolder: `Multiple items found for @${citeKey}. Please select one:`,
-                matchOnDescription: true,
-                matchOnDetail: true
-            });
-            if (!selected) { return null; }
-            // overwrite defaults (first match) with user selection
-            zoteroKey = selected.zoteroKey;
-            libraryID = selected.libraryID;
-        }
+        // handle possible multiple zotero items with the same citeKey
+        const item = await this.pickItem(citeKey, matches);
+        if (!item) { return null; }
 
         // query open options for the selected item
         const openOptions = this.getFirstValue(
-            this.db.exec(queryOpenOptions(zoteroKey, libraryID))
+            this.db.exec(queryOpenOptions(item.zoteroKey, item.libraryID))
         );
-        if (!openOptions) {
-            return null;
-        }
+        if (!openOptions) { return null; }
         const { groupID, pdfKey, doi } = openOptions;
 
-        const options: any[] = [{ type: 'zotero', key: zoteroKey, groupID }];
+        const options: any[] = [{ type: 'zotero', key: item.zoteroKey, groupID }];
         if (pdfKey) { options.push({ type: 'pdf', key: pdfKey, groupID }); }
         if (doi) { options.push({ type: 'doi', key: doi }); }
 
         return options;
     }
+
+    /**
+     * this function is called to handle possibility of multiple zotero items with the same citeKey
+     * if there is only one match, it is returned
+     * if there are multiple matches the user is prompted to select one
+     * @param citeKey the citeKey being resolved
+     * @param matches the list of zotero items matching the citeKey
+     * @returns the single resolved item, or null if the user cancels the picker
+     */
+    private async pickItem(citeKey: string, matches: any[]): Promise<any | null> {
+        if (matches.length === 0) { return null; }
+        if (matches.length === 1) { return matches[0]; }
+
+        const quickPickItems = matches.map(m => ({
+            label: `${formatTypes(m.typeName)} ${m.title}`,
+            detail: m.libraryName || 'My Library',
+            item: m,
+        }));
+        const selected = await vscode.window.showQuickPick(quickPickItems, {
+            placeHolder: `Multiple items found for @${citeKey}. Please select one:`,
+            matchOnDetail: true,
+        });
+        return selected?.item ?? null;
+    }
+
+    /**
+     * resolves a list of cite keys to zotero items
+     * @param citeKeys list of cite keys to resolve
+     * @returns resolved items and cite keys not found in the database
+     */
+    public async resolveItems(citeKeys: string[]): 
+        Promise<{ resolved: any[]; excluded: string[] }> 
+    {
+        if (!this.db) {
+            vscode.window.showErrorMessage('Database not connected');
+            return { resolved: [], excluded: [...citeKeys] };
+        }
+
+        const items = this.getValues(this.db.exec(queryZoteroKeys(citeKeys)));
+
+        // group items by citeKey to handle possible multiple items with the same citeKey
+        const byKey = new Map<string, any[]>();
+        for (const item of items) {
+            if (!byKey.has(item.citeKey)) { byKey.set(item.citeKey, []); }
+            byKey.get(item.citeKey)!.push(item);
+        }
+
+        const resolved: any[] = [];
+        const excluded: string[] = [];
+
+        for (const citeKey of citeKeys) {
+            const item = await this.pickItem(citeKey, byKey.get(citeKey) ?? []);
+            if (item) { resolved.push(item); } else { excluded.push(citeKey); }
+        }
+
+        return { resolved, excluded };
+    }
+
 
     /**
      * closes the database connection to releases resources.
