@@ -119,7 +119,7 @@ export class BibManager {
      * @returns content — the Bib(La)TeX string (empty signals a fatal error);
      *          excluded — keys that BBT could not resolve
      */
-    public async bbtBatchExport(items: any[]): Promise<{ content: string; excluded: string[] }> {
+    public async bbtBatchExport(items: any[]): Promise<{ content: string | null; excluded: string[] }> {
         const excluded: string[] = [];
         const allContents: string[] = [];
 
@@ -136,7 +136,7 @@ export class BibManager {
             while (remaining.length > 0) {
                 const result = await this.bbtCall(remaining);
                 // null means there was some fatal error, so we should stop trying
-                if (result === null) { return { content: '', excluded }; }
+                if (result === null) { return { content: null, excluded }; }
 
                 // all keys resolved successfully, so add to allContents and break out of while loop
                 if (typeof result === 'string') {
@@ -250,7 +250,7 @@ async function askBibFilePath(): Promise<string | null> {
  * @param bibFile name of the bibliography file
  * @returns content of the bibliography file as a string
  */
-async function ensureBibFile(bibUri: vscode.Uri): Promise<string> {
+export async function ensureBibFile(bibUri: vscode.Uri): Promise<string> {
     if (!await fileExists(bibUri)) {
         await initBib(bibUri);
         vscode.window.showInformationMessage(`Created new bibliography file at ${bibUri.fsPath}`);

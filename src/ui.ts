@@ -13,7 +13,7 @@ import {
  * Initializes the Zotero database connection using the path specified in the extension settings.
  * @returns ZoteroDatabase instance
  */
-function initZoteroDb(): ZoteroDatabase {
+export function initZoteroDb(): ZoteroDatabase {
     const config = vscode.workspace.getConfiguration('zotero');
     const zoteroDbPath = expandPath(config.get<string>('zoteroDbPath', '~/Zotero/zotero.sqlite'));
     if (!existsSync(zoteroDbPath)) {
