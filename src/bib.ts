@@ -11,6 +11,10 @@ import {
     writeFileFromString
 } from './io';
 
+class NotFound {
+    constructor(public readonly key: string) { }
+}
+
 /**
  * class for finding, managing *.bib files, and communicating with Better BibTeX for exporting Bib(La)TeX entries
  * @param editor vscode.TextEditor instance to determine current document and workspace context.
@@ -39,7 +43,7 @@ export class BibManager {
      * @param bibFile name of bibliography file
      * @returns vscode.Uri for the bibliography file
      */
-    private resolveBibUri(bibFile: string): vscode.Uri {
+    public resolveBibUri(bibFile: string): vscode.Uri {
         // if bibFile is an absolute path, return it as is
         if (path.isAbsolute(bibFile)) {
             return vscode.Uri.file(bibFile);
@@ -47,51 +51,107 @@ export class BibManager {
         // otherwise, resolve it relative to the current document
         return vscode.Uri.joinPath(this.editor.document.uri, '..', bibFile);
     }
-    
-    /**
-     * Parse the response from Better BibTeX JSON-RPC call
-     * @param json JSON response
-     * @returns Bib(La)TeX entry if successful, otherwise empty string and shows error message
-     */
-    private parseBbtResponse(json: any): string {
-        if (json.error) {
-            const msg = json.error.code === -32603
-                ? 'Cannot connect to Better BibTeX. Make sure Zotero window is open!'
-                : `Better BibTeX error: ${json.error.message || 'Unknown error'}`;
-            vscode.window.showErrorMessage(msg);
-            return '';
-        }
-        if (typeof json.result !== 'string') {
-            vscode.window.showErrorMessage('Better BibTeX returned invalid result format');
-            return '';
-        }
-        return json.result;
-    }
 
     /**
-     * get Bib(La)TeX entry using Better BibTeX json-rpc
-     * @param item the zotero item to convert.
-     * @returns Bib(La)TeX entry.
+     * send a JSON-RPC request to Better BibTeX to export the given items, and return the raw response
+     * @param items 
+     * @returns Response from the Better BibTeX API
      */
-    public async bbtExport(item: any): Promise<string> {
+    private async bbtGetResponse(items: any[]): Promise<Response> {
         const url = `${this.serverUrl}/better-bibtex/json-rpc`;
         const payload = {
             jsonrpc: '2.0',
             method: 'item.export',
-            params: { citekeys: [item.citeKey], translator: this.translator, libraryID: item.libraryID }
+            params: {
+                citekeys: items.map(i => i.citeKey),
+                translator: this.translator,
+                libraryID: items[0].libraryID
+            }
         };
+        return await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+            body: JSON.stringify(payload),
+        });
+    }
 
+    /**
+     * Raw JSON-RPC call to Better BibTeX.
+     * @param citeKeys list of citation keys to export
+     * @param libraryID optional Zotero library ID to constrain the search
+     * @returns discriminated union: ok with content, notFound with the offending key, or fatal with an error message
+     */
+    private async bbtCall(items: any[]): Promise<string | NotFound | null> {
         try {
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-                body: JSON.stringify(payload),
-            });
-            return this.parseBbtResponse(await response.json());
+            const response = await this.bbtGetResponse(items);
+            const json = await response.json();
+
+            if (typeof json.result === 'string') { return json.result; }
+
+            const errMsg: string = json.error?.message ?? '';
+            if (errMsg.toLowerCase().includes('not found')) {
+                return new NotFound(errMsg.match(/['"]([^'"]+)['"]/)?.[1] ?? '');
+            }
+            vscode.window.showErrorMessage('Cannot connect to Better BibTeX. Make sure Zotero is running!');
+            return null;
         } catch {
             vscode.window.showErrorMessage('Cannot connect to Better BibTeX. Make sure Zotero is running!');
-            return '';
+            return null;
         }
+    }
+
+    /**
+     * Export a single Zotero item to Bib(La)TeX via Better BibTeX.
+     * @param item Zotero item with citeKey and libraryID
+     * @returns Bib(La)TeX entry string, or empty string
+     */
+    public async bbtExport(item: any): Promise<string> {
+        const result = await this.bbtCall([item]);
+        // if result is string, return as is, otherwise return empty string
+        if (typeof result === 'string') { return result; }
+        return '';
+    }
+
+    /**
+     * Export a list of items from Better BibTeX, grouped by libraryID.
+     * Retries after each "not found" result by dropping the unresolvable key.
+     * @param items list of items with citeKey and optional libraryID
+     * @returns content — the Bib(La)TeX string (empty signals a fatal error);
+     *          excluded — keys that BBT could not resolve
+     */
+    public async bbtBatchExport(items: any[]): Promise<{ content: string; excluded: string[] }> {
+        const excluded: string[] = [];
+        const allContents: string[] = [];
+
+        // group by libraryID so each BBT call is scoped to one library
+        const byLibrary = new Map(
+            [...new Set(items.map(i => i.libraryID))].map(lib => [lib, items.filter(i => i.libraryID === lib)])
+        );
+
+        // for each library, try to export all items
+        // if some keys are not found, drop them and retry
+        for (const [, group] of byLibrary) {
+            let remaining = [...group];
+
+            while (remaining.length > 0) {
+                const result = await this.bbtCall(remaining);
+                // null means there was some fatal error, so we should stop trying
+                if (result === null) { return { content: '', excluded }; }
+
+                // all keys resolved successfully, so add to allContents and break out of while loop
+                if (typeof result === 'string') {
+                    allContents.push(result);
+                    break;
+                }
+                // if we get a NotFound result, drop the unresolvable key and retry with the rest
+                if (result instanceof NotFound) {
+                    excluded.push(result.key);
+                    remaining = remaining.filter(i => i.citeKey !== result.key);
+                }
+            }
+        }
+
+        return { content: allContents.join('\n'), excluded };
     }
 
     /**
@@ -109,7 +169,7 @@ export class BibManager {
         if (['latex', 'tex', 'plaintex'].includes(this.fileType)) {
             bibPath = locateBibTex(text);
         }
-        
+
         // if no bib file found in document, look for in workspace or ask user
         // if still no bib file found, ask user for path to bib file 
         return bibPath ?? await locateWorkspaceBib(this.editor.document.uri) ?? await askBibFilePath();
@@ -136,7 +196,7 @@ export class BibManager {
                 this.insertCite(citeKey);
                 return;
             }
-            
+
             // get bib entry from Better BibTeX
             const bibEntry = await this.bbtExport(item);
             if (!isValidBibEntry(bibEntry)) {
@@ -210,7 +270,7 @@ async function initBib(bibUri: vscode.Uri): Promise<void> {
     // Create empty file
     await writeFileFromString(bibUri, '');
 }
-        
+
 /**
  * Check if a given citeKey already exists in the bibliography content.
  * @param citeKey Better BibTeX citation key to check for
@@ -291,12 +351,9 @@ async function locateWorkspaceBib(docUri: vscode.Uri): Promise<string | null> {
     const bibUris = await vscode.workspace.findFiles(bibPattern);
     if (bibUris.length === 0) { return null; }
 
-    // then sort bib files by their depth
     // prioritize bib files closer to the current document
-    const depth = (rel: string) => (rel.match(/\.\.\//g) ?? []).length;
-    const bibs = bibUris
-        .map(uri => toDocRelative(docUri, uri))
-        .sort((a, b) => depth(a) - depth(b));
+    const bibs = sortByDistance(bibUris, docUri)
+        .map(uri => toDocRelative(docUri, uri));
 
     // if there are multiple bib files, prioritize 'bibliography.bib' or 'references.bib'
     // if neither of those files exist, just return the closest one
@@ -311,4 +368,17 @@ async function locateWorkspaceBib(docUri: vscode.Uri): Promise<string | null> {
 function toDocRelative(docUri: vscode.Uri, fileUri: vscode.Uri): string {
     const docDir = path.posix.dirname(docUri.path);
     return path.posix.relative(docDir, fileUri.path);
+}
+
+/**
+ * Sort file URIs by ascending path distance from a reference document URI.
+ * Prefers files that require fewer upward traversals, then fewer path segments.
+ */
+export function sortByDistance(uris: vscode.Uri[], refUri: vscode.Uri): vscode.Uri[] {
+    const refDir = path.posix.dirname(refUri.path);
+    const depth = (uri: vscode.Uri) => {
+        const rel = path.posix.relative(refDir, uri.path);
+        return (rel.match(/\.\.\//g) ?? []).length;
+    };
+    return [...uris].sort((a, b) => depth(a) - depth(b));
 }
