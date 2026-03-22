@@ -193,8 +193,10 @@ async function selectFiles(editor: vscode.TextEditor, fileType: string): Promise
     if (choice === 'Current file only') { return [editor.document.uri]; }
 
     // Show checkbox list sorted by distance from current file
-    const sorted = sortByDistance(allFiles, editor.document.uri);
+    let sorted = sortByDistance(allFiles, editor.document.uri);
     const currentFsPath = editor.document.uri.fsPath;
+    // current file should always be at the top
+    sorted = [editor.document.uri].concat(sorted.filter(uri => uri.fsPath !== currentFsPath));
     const items = sorted.map(uri => ({
         label: path.posix.relative(workspaceFolder.uri.path, uri.path),
         description: uri.fsPath === currentFsPath ? '(current)' : undefined,

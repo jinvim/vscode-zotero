@@ -378,7 +378,8 @@ export function sortByDistance(uris: vscode.Uri[], refUri: vscode.Uri): vscode.U
     const refDir = path.posix.dirname(refUri.path);
     const depth = (uri: vscode.Uri) => {
         const rel = path.posix.relative(refDir, uri.path);
-        return (rel.match(/\.\.\//g) ?? []).length;
+        return rel.split('/').length - 1;
     };
-    return [...uris].sort((a, b) => depth(a) - depth(b));
+    // sort by dept first, then alphabetically
+    return [...uris].sort((a, b) => depth(a) - depth(b) || a.path.localeCompare(b.path));
 }
