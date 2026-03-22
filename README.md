@@ -48,6 +48,21 @@ For any citations that were inserted using this extension, you can:
 1. Open and show the item in Zotero library
 1. Open DOI link using the default browser
 
+### Tidy up `*.bib` file (`zotero.tidyBib`)
+(macOS: <kbd>ctrl</kbd> + <kbd>cmd</kbd> + <kbd>t</kbd>, Windows/Linux: <kbd>ctrl</kbd> + <kbd>alt</kbd> + <kbd>t</kbd>).
+
+![Screenshot of tidy up bib file](https://raw.githubusercontent.com/jinvim/vscode-zotero/refs/heads/main/resources/fig3.gif)
+
+If you have a `*.bib` file with unused entries? Or maybe you manually added references to the manuscript file without using this extension?
+This command will tidy up the `*.bib` file by:
+
+* Adding any missing bib entries that are used in the manuscript file but not in the `*.bib` file.
+* Removing bib entries that are not used in the manuscript file.
+* Sorting bib entries in `*.bib` file by alphabetical order.
+
+The plugin will automatically create a backup of the original `*.bib` file before overwriting it.
+It also checks if there are multiple documents in the workspace. If so, it will ask user to select the manuscript file that will be used for tidying up the `.bib` file.
+
 ## Extension Settings
 
 * `zotero.zoteroDbPath`: Path to Zotero database file (default: `~/Zotero/zotero.sqlite`).

@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-03-21
+
+### New features
+
+- New command to tidy up the `*.bib` file by removing unused entries (#24).
+
+
 ## [1.3.2] - 2026-03-06
 
 ### Bug fixes
