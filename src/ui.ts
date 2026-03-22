@@ -6,14 +6,14 @@ import {
     BibManager,
     sortByDistance,
 } from './bib';
-import {writeFileFromString} from './io';
+import { writeFileFromString } from './io';
 import {
-    parseCiteKeys,
     extractBibKeys,
     msgSummary,
     collectCiteKeys,
     resolveBibFile,
-    getNewBibContent
+    getNewBibContent,
+    backupBib
 } from './tidy';
 import {
     expandPath,
@@ -253,6 +253,11 @@ export async function tidyBib(): Promise<void> {
                 );
             }
             return;
+        }
+
+        // if there are existing entries in the bib file, back it up before overwriting
+        if (bib.previousKeys.size > 0) {
+            await backupBib(bib.bibUri);
         }
 
         await writeFileFromString(bib.bibUri, newBibContent);

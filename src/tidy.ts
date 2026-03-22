@@ -3,7 +3,7 @@ import {
     BibManager,
     ensureBibFile
 } from './bib';
-import { readFileAsString } from './io';
+import { readFileAsString, writeFileFromString } from './io';
 import { initZoteroDb } from './ui';
 
 
@@ -129,4 +129,11 @@ export function msgSummary(previousKeys: Set<string>, newKeys: Set<string>, excl
     return parts.length > 0
         ? `Bibliography refreshed: ${parts.join('. ')}.`
         : 'Bibliography is already up to date.';
+}
+
+
+export async function backupBib(bibUri: vscode.Uri): Promise<void> {
+    const bakUri = bibUri.with({ path: bibUri.path + '.bak' });
+    const currentContent = await readFileAsString(bibUri);
+    await writeFileFromString(bakUri, currentContent);
 }
