@@ -1,7 +1,20 @@
 import * as vscode from 'vscode';
 import { existsSync } from "fs";
 import { ZoteroDatabase } from './zotero';
-import { BibManager } from './bib';
+import * as path from 'path';
+import {
+    BibManager,
+    sortByDistance,
+} from './bib';
+import {writeFileFromString} from './io';
+import {
+    parseCiteKeys,
+    extractBibKeys,
+    msgSummary,
+    collectCiteKeys,
+    resolveBibFile,
+    getNewBibContent
+} from './tidy';
 import {
     expandPath,
     formatAuthors,
@@ -124,4 +137,130 @@ function openAttachment(option: any) {
     };
     const url = urls[option.type];
     if (url) { vscode.env.openExternal(vscode.Uri.parse(url)); }
+}
+
+/**
+ * Prompt the user to select which files to scan for citation keys.
+ * - If only one file exists, returns it immediately.
+ * - If multiple exist, first asks whether to use the current file only,
+ *   then (if not) shows a multi-select list sorted by path proximity.
+ * @returns array of selected file URIs, or null if the user cancelled.
+ */
+async function selectFiles(editor: vscode.TextEditor, fileType: string): Promise<vscode.Uri[] | null> {
+    let globPattern = '';
+
+    switch (fileType) {
+        case 'latex':
+        case 'tex':
+        case 'plaintex':
+            globPattern = '**/*.tex';
+            break;
+        case 'markdown':
+            globPattern = '**/*.md';
+            break;
+        case 'quarto':
+            globPattern = '**/*.qmd';
+            break;
+        default:
+            return null;
+    }
+
+    const workspaceFolder =
+        vscode.workspace.getWorkspaceFolder(editor.document.uri) ??
+        vscode.workspace.workspaceFolders?.[0];
+    if (!workspaceFolder) {
+        vscode.window.showErrorMessage('No workspace folder found');
+        return null;
+    }
+
+    const pattern = new vscode.RelativePattern(workspaceFolder, globPattern);
+    const allFiles = await vscode.workspace.findFiles(pattern);
+    if (allFiles.length === 0) {
+        vscode.window.showErrorMessage(`No matching files found in workspace`);
+        return null;
+    }
+
+    if (allFiles.length === 1) {
+        return allFiles;
+    }
+
+    // Multiple files: ask whether to use only the current file
+    const choice = await vscode.window.showQuickPick(
+        ['Current file only', 'Select files to include'],
+        { placeHolder: 'Which files should be scanned for citations?' }
+    );
+    if (!choice) { return null; }
+    if (choice === 'Current file only') { return [editor.document.uri]; }
+
+    // Show checkbox list sorted by distance from current file
+    const sorted = sortByDistance(allFiles, editor.document.uri);
+    const currentFsPath = editor.document.uri.fsPath;
+    const items = sorted.map(uri => ({
+        label: path.posix.relative(workspaceFolder.uri.path, uri.path),
+        description: uri.fsPath === currentFsPath ? '(current)' : undefined,
+        uri,
+        picked: uri.fsPath === currentFsPath,
+    }));
+
+    const selected = await vscode.window.showQuickPick(items, {
+        placeHolder: 'Select files to scan for citations',
+        canPickMany: true,
+    });
+    if (!selected || selected.length === 0) { return null; }
+    return selected.map(item => item.uri);
+}
+
+/**
+ * Refresh the bibliography file by:
+ * 1. Scanning selected source files for all citation keys.
+ * 2. Exporting exactly those entries from Better BibTeX.
+ * 3. Overwriting the existing .bib file with the fresh export.
+ * 4. Reporting how many entries were added, removed, or not found in Zotero.
+ */
+export async function tidyBib(): Promise<void> {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) {
+        vscode.window.showErrorMessage('No active editor');
+        return;
+    }
+
+    const fileType = editor.document.languageId;
+    if (!(['latex', 'tex', 'plaintex', 'markdown', 'quarto'].includes(fileType))) {
+        vscode.window.showErrorMessage(
+            `Unsupported file type: ${fileType}. Only LaTeX, Markdown, and Quarto files are supported.`
+        );
+        return;
+    }
+
+    try {
+        const selectedFiles = await selectFiles(editor, fileType);
+        if (!selectedFiles) { return; }
+
+        const allCiteKeys = await collectCiteKeys(selectedFiles, fileType);
+        if (allCiteKeys.size === 0) {
+            vscode.window.showInformationMessage('No citation keys found in selected files');
+            return;
+        }
+
+        const bib = await resolveBibFile(editor, fileType);
+        if (!bib) { return; }
+
+        const { newBibContent, excluded } = await getNewBibContent(bib.bibManager, [...allCiteKeys]);
+        if (!newBibContent) {
+            if (excluded.length > 0) {
+                vscode.window.showErrorMessage(
+                    `None of ${excluded.length} key(s) could be resolved in Zotero.`
+                );
+            }
+            return;
+        }
+
+        await writeFileFromString(bib.bibUri, newBibContent);
+
+        const summary = msgSummary(bib.previousKeys, extractBibKeys(newBibContent), excluded);
+        vscode.window.showInformationMessage(summary);
+
+    } catch (error) {
+        handleError(error, 'Failed to tidy bibliography');
+    }
 }

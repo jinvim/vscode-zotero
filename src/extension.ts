@@ -1,6 +1,5 @@
 import * as vscode from 'vscode';
-import { searchLibrary, openItem } from './ui';
-import { tidyBib } from './tidy';
+import { searchLibrary, openItem, tidyBib } from './ui';
 
 export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
