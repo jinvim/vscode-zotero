@@ -9,8 +9,10 @@ import { initZoteroDb } from './ui';
 
 function parseTexKeys(content: string): Set<string> {
     const keys = new Set<string>();
-    // Matches: \cite{key}, \citep[opt]{key}, \citet{key1,key2}, etc.
-    const citeRegex = /\\cite\w*\s*(?:\[[^\]]*\])?\s*\{([^}]+)\}/g;
+    // Matches any LaTeX cite command containing "cite" in its name:
+    // \cite{}, \citep[opt]{}, \citet{key1,key2}, \parencite{}, \textcite{},
+    // \autocite{}, \footcite{}, etc.
+    const citeRegex = /\\\w*cite\w*\*?\s*(?:\[[^\]]*\]\s*)*\{([^}]+)\}/g;
     let match;
     while ((match = citeRegex.exec(content)) !== null) {
         for (const key of match[1].split(',')) {
@@ -113,7 +115,6 @@ export async function getNewBibContent(
     zoteroDb.close();
 
     const { content: newBibContent, excluded: bbtExcluded } = await bibManager.bbtBatchExport(resolved);
-    console.log(newBibContent);
     return { newBibContent, excluded: [...dbExcluded, ...bbtExcluded] };
 }
 
