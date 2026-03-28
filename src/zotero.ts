@@ -93,7 +93,6 @@ export class ZoteroDatabase {
         }
 
         const matches = this.getValues(this.db.exec(queryZoteroKeys([citeKey])));
-        console.log(matches);
         if (matches.length === 0) {
             vscode.window.showErrorMessage(`Could not find Zotero item for ${citeKey}`);
             return null;
