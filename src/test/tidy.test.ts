@@ -66,6 +66,10 @@ suite('parseTexKeys', () => {
             const result = parseTexKeys('\\cite{smith2020}{jones1999}');
             assert.deepStrictEqual(result, new Set(['smith2020', 'jones1999']));
         });
+        test('\\cite[opt]{key1}{key2}', () => {
+            const result = parseTexKeys('\\cite[see]{smith2020}{jones1999}');
+            assert.deepStrictEqual(result, new Set(['smith2020', 'jones1999']));
+        });
     });
 
     suite('chained commands', () => {

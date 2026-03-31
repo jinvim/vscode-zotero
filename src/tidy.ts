@@ -16,7 +16,7 @@ function parseTexKeys(content: string): Set<string> {
     while ((m = cmdRegex.exec(content)) !== null) {
         // match one or more ([opt]){key} groups that follow the cite command
         const after = content.slice(m.index + m[0].length);
-        const seq = after.match(/^(\s*(\[[^\]]*\])?\s*\{[^}]*\})+/);
+        const seq = after.match(/^(\s*(\[[^\]]*\])*\s*\{[^}]*\})+/);
         if (!seq) { continue; }
         // extract keys from every {...} in the sequence
         const braceRegex = /\{([^}]*)\}/g;
