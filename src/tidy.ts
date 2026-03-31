@@ -9,15 +9,24 @@ import { initZoteroDb } from './ui';
 
 function parseTexKeys(content: string): Set<string> {
     const keys = new Set<string>();
-    // Matches any LaTeX cite command containing "cite" in its name:
-    // \cite{}, \citep[opt]{}, \citet{key1,key2}, \parencite{}, \textcite{},
-    // \autocite{}, \footcite{}, etc.
-    const citeRegex = /\\\w*cite\w*\*?\s*(?:\[[^\]]*\]\s*)*\{([^}]+)\}/g;
-    let match;
-    while ((match = citeRegex.exec(content)) !== null) {
-        for (const key of match[1].split(',')) {
-            const trimmed = key.trim();
-            if (trimmed) { keys.add(trimmed); }
+    // find any \cite command, case-insensitive (covers \Cites, \Parencite, etc.)
+    // excludes \nocite
+    const cmdRegex = /\\(?!nocite)[a-z]*cite[a-z]*\*?/gi;
+    let m;
+    while ((m = cmdRegex.exec(content)) !== null) {
+        // match one or more ([opt]){key} groups that follow the cite command
+        const after = content.slice(m.index + m[0].length);
+        const seq = after.match(/^(\s*(\[[^\]]*\])?\s*\{[^}]*\})+/);
+        if (!seq) { continue; }
+        // extract keys from every {...} in the sequence
+        const braceRegex = /\{([^}]*)\}/g;
+        let b;
+        while ((b = braceRegex.exec(seq[0])) !== null) {
+            // split by comma
+            for (const key of b[1].split(',')) {
+                const trimmed = key.trim();
+                if (trimmed && trimmed !== '*') { keys.add(trimmed); }
+            }
         }
     }
     return keys;
