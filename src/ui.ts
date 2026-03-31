@@ -186,11 +186,12 @@ async function selectFiles(editor: vscode.TextEditor, fileType: string): Promise
 
     // Multiple files: ask whether to use only the current file
     const choice = await vscode.window.showQuickPick(
-        ['Current file only', 'Select files to include'],
+        ['Current file only', 'All files in workspace', 'Select files to include'],
         { placeHolder: 'Which files should be scanned for citations?' }
     );
     if (!choice) { return null; }
     if (choice === 'Current file only') { return [editor.document.uri]; }
+    if (choice === 'All files in workspace') { return allFiles; }
 
     // Show checkbox list sorted by distance from current file
     let sorted = sortByDistance(allFiles, editor.document.uri);
