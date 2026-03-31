@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [1.4.2] - 2026-03-31
+
+### New features
+
+- Add option to tidy up `*.bib` file using all files in the workspace (issue #25, #26).
+
+### Bug fixes
+
+- Fixed issue where `tidyBib` command would not parse chained citation commands such as `\cite{key1}{key2}` (issue #25).
+
 ## [1.4.1] - 2026-03-28
 
 - Fixed issue where `tidyBib` command would not parse BibLaTex command variants such as `\autocite` and `\footcite` (issue #25).
