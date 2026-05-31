@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [1.4.3] - 2026-05-31
+
+### Bug fixes
+
+- Fixed issue where `*.bib` file in the workspace is not correctly resolved for quarto.
+
 ## [1.4.2] - 2026-03-31
 
 ### New features

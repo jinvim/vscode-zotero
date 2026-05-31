@@ -306,7 +306,10 @@ async function locateBibMdProject(): Promise<string | null> {
     const quartoYmlUri = vscode.Uri.joinPath(rootUri, '_quarto.yml');
     if (!await fileExists(quartoYmlUri)) { return null; }
 
-    return locateBibMdYaml(await readFileAsString(quartoYmlUri));
+    const bibRelative = locateBibMdYaml(await readFileAsString(quartoYmlUri));
+    if (!bibRelative) { return null; }
+
+    return vscode.Uri.joinPath(rootUri, bibRelative).fsPath;
 }
 
 /**
