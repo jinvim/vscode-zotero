@@ -25,7 +25,7 @@
         "title": "Zotero: Open Citation Item Under Cursor"
       },
       {
-        "command": "zotero.openItemInZotero",
+        "command": "zotero.openItemZotero",
         "title": "Zotero: Open Citation Item in Zotero"
       },
       {
