@@ -86,7 +86,20 @@ export function searchLibrary() {
     });
 }
 
-export function openItem() {
+/**
+ * Defines possible actions for opening a Zotero item.
+ * - 'zotero': opens the item in the Zotero desktop application.
+ * - 'pdf': opens the associated PDF attachment, if available.
+ * - 'doi': opens the DOI link in the default web browser, if available.
+ */
+export type OpenItemType = 'zotero' | 'pdf' | 'doi';
+
+/**
+ * Opens the citation item under the cursor.
+ * @param preferred if set, opens that option directly when available;
+ *   falls back to the selection prompt otherwise
+ */
+export function openItem(preferred: OpenItemType | null = null) {
     return withZoteroDb(async (zoteroDb, editor) => {
         const wordRange = editor.document.getWordRangeAtPosition(editor.selection.active, /@?[\w-]+/);
         if (!wordRange) {
@@ -100,7 +113,16 @@ export function openItem() {
         const openOptions = await zoteroDb.getOpenOptions(citeKey);
         if (!openOptions) { return; }
         if (openOptions.length === 0) {
-            vscode.window.showInformationMessage('No PDF or DOI found for this item');
+            vscode.window.showInformationMessage('Zotero item not found for citation key: ' + citeKey);
+            return;
+        }
+
+        // Try to find the option matching the preferred open option.
+        // match is undefined/null if no preferred type was given, or if none matched,
+        // which will trigger the prompt for user selection.
+        const match = preferred && openOptions.find(option => option.type === preferred);
+        if (match) {
+            openAttachment(match);
             return;
         }
 
@@ -122,6 +144,18 @@ export function openItem() {
         const selected = await vscode.window.showQuickPick(quickPickItems, { placeHolder: 'Choose action' });
         if (selected) { openAttachment(selected.option); }
     });
+}
+
+/**
+ * Reads the defaultOpenAction setting and opens the citation item under the cursor accordingly.
+ */
+export function quickOpenItem() {
+    const config = vscode.workspace.getConfiguration('zotero');
+    const defaultAction = config.get<string>('defaultOpenAction', 'ask');
+    if (defaultAction === 'ask') {
+        return openItem(null);
+    }
+    return openItem(defaultAction as OpenItemType);
 }
 
 function openAttachment(option: any) {

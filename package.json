@@ -2,7 +2,7 @@
   "name": "vscode-zotero",
   "displayName": "VSCode Zotero",
   "description": "An extension to insert reference from Zotero library and add them to a bib file.",
-  "version": "1.4.3",
+  "version": "1.4.4",
   "engines": {
     "vscode": "^1.105.1"
   },
@@ -23,6 +23,18 @@
       {
         "command": "zotero.openItem",
         "title": "Zotero: Open Citation Item Under Cursor"
+      },
+      {
+        "command": "zotero.openItemInZotero",
+        "title": "Zotero: Open Citation Item in Zotero"
+      },
+      {
+        "command": "zotero.openItemPdf",
+        "title": "Zotero: Open Citation Item PDF"
+      },
+      {
+        "command": "zotero.openItemDoi",
+        "title": "Zotero: Open Citation Item DOI"
       },
       {
         "command": "zotero.tidyBib",
@@ -67,6 +79,23 @@
             "Better BibLaTeX"
           ],
           "description": "Better BibTeX translator to use for exporting entries"
+        },
+        "zotero.defaultOpenAction": {
+          "type": "string",
+          "default": "ask",
+          "enum": [
+            "ask",
+            "zotero",
+            "pdf",
+            "doi"
+          ],
+          "enumDescriptions": [
+            "Always ask",
+            "Open Zotero item",
+            "Open PDF",
+            "Open DOI link"
+          ],
+          "description": "Default action for the 'Zotero: Open Citation Item Under Cursor' command. If the chosen action is unavailable for an item, you will be prompted to choose."
         }
       }
     }

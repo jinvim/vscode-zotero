@@ -1,10 +1,13 @@
 import * as vscode from 'vscode';
-import { searchLibrary, openItem, tidyBib } from './ui';
+import { searchLibrary, openItem, quickOpenItem, tidyBib } from './ui';
 
 export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         vscode.commands.registerCommand('zotero.searchLibrary', searchLibrary),
-        vscode.commands.registerCommand('zotero.openItem', openItem),
+        vscode.commands.registerCommand('zotero.openItem', quickOpenItem),
+        vscode.commands.registerCommand('zotero.openItemInZotero', () => openItem('zotero')),
+        vscode.commands.registerCommand('zotero.openItemPdf', () => openItem('pdf')),
+        vscode.commands.registerCommand('zotero.openItemDoi', () => openItem('doi')),
         vscode.commands.registerCommand('zotero.tidyBib', tidyBib),
     );
 }
