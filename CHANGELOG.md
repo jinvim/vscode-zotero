@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.4.4] - 2026-07-19
+
 ### New features
 
 - Add option to set a default action when opening a Zotero item using `zotero.openItem` command (issue #27).
