@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### New features
+
+- Add option to set a default action when opening a Zotero item using `zotero.openItem` command (issue #27).
+- Added three additional commands for opening Zotero items:
+  - `zotero.openItemZotero`: Open Zotero item in Zotero library
+  - `zotero.openItemPdf`: Open PDF file of the item using Zotero PDF viewer
+  - `zotero.openItemDoi`: Open DOI link using the default browser
+
 ## [1.4.3] - 2026-05-31
 
 ### Bug fixes

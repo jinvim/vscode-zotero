@@ -48,6 +48,15 @@ For any citations that were inserted using this extension, you can:
 1. Open and show the item in Zotero library
 1. Open DOI link using the default browser
 
+You can set the default action when opening a Zotero item using `zotero.openItem` in the extension settings (see `zotero.defaultOpenAction` in Extension Settings).
+Default is `ask`, where you will always be asked which type of item to open.
+
+There are three additional commands without default keybindings:
+
+- `zotero.openItemZotero`: Open Zotero item in Zotero library
+- `zotero.openItemPdf`: Open PDF file of the item using Zotero PDF viewer
+- `zotero.openItemDoi`: Open DOI link using the default browser
+
 ### Tidy up `*.bib` file (`zotero.tidyBib`)
 (macOS: <kbd>ctrl</kbd> + <kbd>cmd</kbd> + <kbd>t</kbd>, Windows/Linux: <kbd>ctrl</kbd> + <kbd>alt</kbd> + <kbd>t</kbd>).
 
@@ -68,6 +77,11 @@ It also checks if there are multiple documents in the workspace. If so, it will 
 * `zotero.zoteroDbPath`: Path to Zotero database file (default: `~/Zotero/zotero.sqlite`).
 * `zotero.betterBibtexDbPath`: Path to Better BibTex database file (default: `~/Zotero/better-bibtex.sqlite`).
 * `zotero.betterBibtexTranslator`: Better BibTeX translator to use for exporting entries (default: `Better BibLaTeX`).
+* `zotero.defaultOpenAction`: Default action when opening a Zotero item using `zotero.openItem` (default: `ask`).
+  * `ask`: Always ask.
+  * `zotero`: Open Zotero item.
+  * `pdf`: Open PDF.
+  * `doi`: Open DOI link.
 
 ## Customizing *.bib entry
 
