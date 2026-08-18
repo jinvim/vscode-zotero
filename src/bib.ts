@@ -287,8 +287,18 @@ export function checkCiteKeyExists(citeKey: string, bibContent: string): boolean
 
 // functions to locate bibliography file
 /**
- * Check for biblography file in markdown/quarto documents in the YAML header
+ * Extract the YAML header block (--- ... ---)
+ * from a markdown/quarto document
  * @param text content of current file
+ * @returns YAML header if found, otherwise null
+ */
+function extractYamlHeader(text: string): string | null {
+    return text.match(/^---\r?\n([\s\S]*?)\r?\n---\s*(?:\r?\n|$)/)?.[1] ?? null;
+}
+
+/**
+ * Check for biblography file in YAML content
+ * @param text YAML content (e.g. a document's frontmatter, or _quarto.yml)
  * @returns bibliography file path if found, otherwise null
  */
 function locateBibMdYaml(text: string): string | null {
@@ -319,7 +329,8 @@ async function locateBibMdProject(): Promise<string | null> {
  * @returns bibliography file path if found, otherwise null
  */
 async function locateBibMd(text: string): Promise<string | null> {
-    return locateBibMdYaml(text) ?? await locateBibMdProject();
+    const frontmatter = extractYamlHeader(text);
+    return (frontmatter ? locateBibMdYaml(frontmatter) : null) ?? await locateBibMdProject();
 }
 
 /**

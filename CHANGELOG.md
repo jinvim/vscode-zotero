@@ -2,11 +2,15 @@
 
 ## [Unreleased]
 
+## [1.4.5] - 2026-08-18
+
+- Fixed issue where reference to `*.bib` file in Quarto or Markdown document is not correctly resolved, when the `*.bib` file is mentioned in the body of the document (issue #29; Thanks to @ZhenluRen).
+
 ## [1.4.4] - 2026-07-19
 
 ### New features
 
-- Add option to set a default action when opening a Zotero item using `zotero.openItem` command (issue #27).
+- Add option to set a default action when opening a Zotero item using `zotero.openItem` command (issue #27; Thanks to @ybeltukov).
 - Added three additional commands for opening Zotero items:
   - `zotero.openItemZotero`: Open Zotero item in Zotero library
   - `zotero.openItemPdf`: Open PDF file of the item using Zotero PDF viewer
