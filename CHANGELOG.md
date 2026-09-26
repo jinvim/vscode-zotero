@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [1.4.6] - 2026-09-26
+
+- Fixed issue where newly added items in Zotero library are not correctly reflected in the citation picker (issue #30; Thanks to @JuanTejedor).
+- Fixed issue where deleted items in Zotero library still appear in the citation picker.
+
 ## [1.4.5] - 2026-08-18
 
 - Fixed issue where reference to `*.bib` file in Quarto or Markdown document is not correctly resolved, when the `*.bib` file is mentioned in the body of the document (issue #29; Thanks to @ZhenluRen).
