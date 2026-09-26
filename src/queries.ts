@@ -31,6 +31,7 @@ export const queryItems = `
             LEFT JOIN creators c      ON c.creatorID = ic.creatorID
                 AND (c.firstName IS NOT NULL OR c.lastName IS NOT NULL)
             LEFT JOIN creatorTypes ct ON ct.creatorTypeID = ic.creatorTypeID
+            WHERE NOT EXISTS (SELECT 1 FROM deletedItems d WHERE d.itemID = it.itemID)
             GROUP BY it.key, itypes.typeName, it.libraryID, p.title, p.date, p.citeKey;
             `;
 
@@ -52,6 +53,7 @@ export function queryZoteroKeys(citeKeys: string[]): string {
                     INNER JOIN itemTypes itypes ON itypes.itemTypeID = it.itemTypeID
                     LEFT JOIN  groups g         ON g.libraryID = it.libraryID
                 WHERE f.fieldName IN ('title', 'citationKey')
+                    AND NOT EXISTS (SELECT 1 FROM deletedItems d WHERE d.itemID = it.itemID)
                 GROUP BY it.key, it.libraryID, itypes.typeName, g.name
                 HAVING MAX(CASE WHEN f.fieldName = 'citationKey' THEN idv.value END) IN (${strKeys});
             `;
@@ -69,9 +71,11 @@ export function queryOpenOptions(zoteroKey: string, libraryID: number): string {
                     LEFT JOIN itemAttachments ia  ON ia.parentItemID = it.itemID
                         AND ia.contentType = 'application/pdf'
                     LEFT JOIN items att           ON att.itemID      = ia.itemID
+                        AND NOT EXISTS (SELECT 1 FROM deletedItems d WHERE d.itemID = att.itemID)
                     LEFT JOIN itemData id         ON id.itemID       = it.itemID
                     LEFT JOIN itemDataValues idv  ON idv.valueID     = id.valueID
                     LEFT JOIN fields f            ON f.fieldID       = id.fieldID
-                WHERE it.key = '${zoteroKey}' AND it.libraryID = ${libraryID};
+                WHERE it.key = '${zoteroKey}' AND it.libraryID = ${libraryID}
+                    AND NOT EXISTS (SELECT 1 FROM deletedItems d WHERE d.itemID = it.itemID);
             `;
 }
