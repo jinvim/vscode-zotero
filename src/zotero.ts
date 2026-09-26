@@ -1,4 +1,4 @@
-import * as fs from 'fs/promises';
+import { readWalSnapshot } from './wal';
 import * as vscode from 'vscode';
 import initSqlJs, { Database } from 'sql.js';
 import {
@@ -30,7 +30,7 @@ export class ZoteroDatabase {
     public async connect() {
         try {
             const SQL = await initSqlJs();
-            const zoteroDbFile = await fs.readFile(this.zoteroDbPath);
+            const zoteroDbFile = await readWalSnapshot(this.zoteroDbPath);
             this.db = new SQL.Database(zoteroDbFile);
         } catch (error) {
             handleError(error, `Failed to connect to databases at ${this.zoteroDbPath}`);
