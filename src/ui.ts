@@ -5,6 +5,7 @@ import * as path from 'path';
 import {
     BibManager,
     sortByDistance,
+    toDocRelative,
 } from './bib';
 import { writeFileFromString } from './io';
 import {
@@ -274,16 +275,11 @@ export async function tidyBib(): Promise<void> {
         if (!selectedFiles) { return; }
 
         const allCiteKeys = await collectCiteKeys(selectedFiles, fileType);
-        if (allCiteKeys.size === 0) {
-            vscode.window.showInformationMessage('No citation keys found in selected files');
-            return;
-        }
-
         const bib = await resolveBibFile(editor, fileType);
         if (!bib) { return; }
 
         const { newBibContent, excluded } = await getNewBibContent(bib.bibManager, [...allCiteKeys]);
-        if (!newBibContent) {
+        if (newBibContent === null || (newBibContent === '' && allCiteKeys.size > 0)) {
             if (excluded.length > 0) {
                 vscode.window.showErrorMessage(
                     `None of ${excluded.length} key(s) could be resolved in Zotero.`
@@ -299,7 +295,9 @@ export async function tidyBib(): Promise<void> {
 
         await writeFileFromString(bib.bibUri, newBibContent);
 
-        const summary = msgSummary(bib.previousKeys, extractBibKeys(newBibContent), excluded);
+        const summary = allCiteKeys.size === 0
+            ? `No citation keys found. Wrote empty ${toDocRelative(editor.document.uri, bib.bibUri)} file.`
+            : msgSummary(bib.previousKeys, extractBibKeys(newBibContent), excluded);
         vscode.window.showInformationMessage(summary);
 
     } catch (error) {

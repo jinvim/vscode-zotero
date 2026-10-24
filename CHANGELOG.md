@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [1.4.7] - 2026-10-24
+
+- Fixed issue where `tidyBib` command would not make change to `*.bib` file when there are no citation keys found in the selected files (issue #31; Thanks to @trainedmoose).
+
 ## [1.4.6] - 2026-09-26
 
 - Fixed issue where newly added items in Zotero library are not correctly reflected in the citation picker (issue #30; Thanks to @JuanTejedor).

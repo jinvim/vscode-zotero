@@ -1,5 +1,14 @@
 import * as assert from 'assert';
-import { parseCiteKeys } from '../tidy';
+import { BibManager } from '../bib';
+import { extractBibKeys, getNewBibContent, msgSummary, parseCiteKeys } from '../tidy';
+
+suite('empty bibliography', () => {
+    test('no citation keys produces empty content', async () => {
+        // No manager is needed: empty input must bypass the export path entirely.
+        const result = await getNewBibContent(undefined as unknown as BibManager, []);
+        assert.deepStrictEqual(result, { newBibContent: '', excluded: [] });
+    });
+});
 
 function parseTexKeys(content: string): Set<string> {
     return parseCiteKeys(content, 'tex');

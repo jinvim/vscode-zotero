@@ -118,6 +118,11 @@ export async function resolveBibFile(
 export async function getNewBibContent(
     bibManager: BibManager, citeKeys: string[]
 ): Promise<{ newBibContent: string | null; excluded: string[] }> {
+    // if no cite keys are found, return empty content & excluded list
+    if (citeKeys.length === 0) {
+        return { newBibContent: '', excluded: [] };
+    }
+
     const zoteroDb = initZoteroDb();
     await zoteroDb.connectIfNeeded();
     const { resolved, excluded: dbExcluded } = await zoteroDb.resolveItems(citeKeys);

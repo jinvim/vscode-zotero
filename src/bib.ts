@@ -379,7 +379,7 @@ async function locateWorkspaceBib(docUri: vscode.Uri): Promise<string | null> {
  * @param filePath absolute file path
  * @returns relative file path from the current document
  */
-function toDocRelative(docUri: vscode.Uri, fileUri: vscode.Uri): string {
+export function toDocRelative(docUri: vscode.Uri, fileUri: vscode.Uri): string {
     const docDir = path.posix.dirname(docUri.path);
     return path.posix.relative(docDir, fileUri.path);
 }
