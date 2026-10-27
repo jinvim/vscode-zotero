@@ -40,15 +40,16 @@ export class BibManager {
      * Resolve the URI for the bibliography file
      * If the path is absolute, return as is.
      * If the path is relative, resolve URI relative to the current document.
-     * @param bibFile name of bibliography file
+     * @param bibFile bibliography path or already resolved URI
      * @returns vscode.Uri for the bibliography file
      */
-    public resolveBibUri(bibFile: string): vscode.Uri {
-        // if bibFile is an absolute path, return it as is
+    public resolveBibUri(bibFile: string | vscode.Uri): vscode.Uri {
+        // Workspace discovery already provides a resolved URI. Keep its scheme,
+        // authority and drive intact instead of converting it to a relative path.
+        if (typeof bibFile !== 'string') { return bibFile; }
         if (path.isAbsolute(bibFile)) {
             return vscode.Uri.file(bibFile);
         }
-        // otherwise, resolve it relative to the current document
         return vscode.Uri.joinPath(this.editor.document.uri, '..', bibFile);
     }
 
@@ -158,7 +159,7 @@ export class BibManager {
      * find biblography file based on fileType, then workspace, then asking user for path
      * @returns bibliography file path or null if not found.
      */
-    public async locateBibFile(): Promise<string | null> {
+    public async locateBibFile(): Promise<string | vscode.Uri | null> {
         const text = this.editor.document.getText();
         let bibPath: string | null = null;
 
@@ -355,7 +356,7 @@ function locateBibTex(text: string): string | null {
  * Check for biblography file in the root of the workspace
  * @returns bibliography file path if found, otherwise null
  */
-async function locateWorkspaceBib(docUri: vscode.Uri): Promise<string | null> {
+async function locateWorkspaceBib(docUri: vscode.Uri): Promise<vscode.Uri | null> {
     // get workspace folder for current document, or default to first workspace folder if not found
     const workspaceFolder = vscode.workspace.getWorkspaceFolder(docUri) ?? vscode.workspace.workspaceFolders?.[0];
     if (!workspaceFolder) { return null; }
@@ -366,12 +367,11 @@ async function locateWorkspaceBib(docUri: vscode.Uri): Promise<string | null> {
     if (bibUris.length === 0) { return null; }
 
     // prioritize bib files closer to the current document
-    const bibs = sortByDistance(bibUris, docUri)
-        .map(uri => toDocRelative(docUri, uri));
+    const bibs = sortByDistance(bibUris, docUri);
 
     // if there are multiple bib files, prioritize 'bibliography.bib' or 'references.bib'
     // if neither of those files exist, just return the closest one
-    const preferred = bibs.find(rel => ['bibliography.bib', 'references.bib'].includes(path.posix.basename(rel))) ?? bibs[0];
+    const preferred = bibs.find(uri => ['bibliography.bib', 'references.bib'].includes(path.posix.basename(uri.path))) ?? bibs[0];
     return preferred;
 }
 

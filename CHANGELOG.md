@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [1.4.8] - 2026-10-26
+
+- Changed how `resolveBibUri` handles relative paths to `*.bib` files.
+
 ## [1.4.7] - 2026-10-24
 
 - Fixed issue where `tidyBib` command would not make change to `*.bib` file when there are no citation keys found in the selected files (issue #31; Thanks to @trainedmoose).
